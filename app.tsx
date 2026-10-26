@@ -1478,7 +1478,7 @@ function DashboardOngPage({ ong, voluntariados, ongDashTab, setOngDashTab, nav, 
                   <p style={{ color: "#9ca3af", textAlign: "center", padding: "2rem" }}>Nenhuma inscrição recebida ainda.</p>
                 ) : (
                   <div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1fr 1.2fr", gap: "0.75rem", padding: "0.5rem 0.75rem", marginBottom: "0.5rem" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr 0.85fr 0.95fr 2fr", gap: "0.75rem", padding: "0.5rem 0.75rem", marginBottom: "0.5rem" }}>
                       {["Voluntário", "Oportunidade", "Inscrição", "Status", "Ação"].map(h => (
                         <span key={h} style={{ fontSize: "0.7rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</span>
                       ))}
@@ -1489,7 +1489,7 @@ function DashboardOngPage({ ong, voluntariados, ongDashTab, setOngDashTab, nav, 
                       const nome = nomes[i % nomes.length];
                       const sstyle = statusStyle[v.status];
                       return (
-                        <div key={v.id} style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1fr 1.2fr", gap: "0.75rem", padding: "0.75rem", borderBottom: "1px solid #f3f4f6", alignItems: "center" }}>
+                        <div key={v.id} style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr 0.85fr 0.95fr 2fr", gap: "0.75rem", padding: "0.75rem", borderBottom: "1px solid #f3f4f6", alignItems: "center" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.9rem", flexShrink: 0 }}>👤</div>
                             <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>{nome}</span>
@@ -1499,12 +1499,21 @@ function DashboardOngPage({ ong, voluntariados, ongDashTab, setOngDashTab, nav, 
                           <span style={{ fontSize: "0.75rem", fontWeight: 600, padding: "0.2rem 0.55rem", borderRadius: 99, background: sstyle.bg, color: sstyle.color }}>
                             {statusLabel[v.status]}
                           </span>
-                          <select value={v.status} onChange={e => onStatusChange(v.id, e.target.value as StatusVoluntariado)}
-                            style={{ fontSize: "0.8rem", padding: "0.3rem 0.5rem", borderRadius: 7, border: "1px solid #e5e7eb", outline: "none", fontFamily: "inherit", cursor: "pointer" }}>
-                            {(["pendente", "aprovado", "em_andamento", "recusado", "concluido"] as StatusVoluntariado[]).map(s => (
-                              <option key={s} value={s}>{statusLabel[s]}</option>
-                            ))}
-                          </select>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", minWidth: 0 }}>
+                            <select value={v.status} onChange={e => onStatusChange(v.id, e.target.value as StatusVoluntariado)}
+                              style={{ flex: 1, minWidth: 0, fontSize: "0.8rem", padding: "0.3rem 0.4rem", borderRadius: 7, border: "1px solid #e5e7eb", outline: "none", fontFamily: "inherit", cursor: "pointer" }}>
+                              {(["pendente", "aprovado", "em_andamento", "recusado", "concluido"] as StatusVoluntariado[]).map(s => (
+                                <option key={s} value={s}>{statusLabel[s]}</option>
+                              ))}
+                            </select>
+                            <button type="button" onClick={() => onStatusChange(v.id, "concluido")}
+                              disabled={v.status !== "em_andamento"}
+                              aria-label={v.status === "concluido" ? "Ação confirmada" : "Confirmar ação"}
+                              title={v.status === "concluido" ? "Ação confirmada" : "Confirmar ação realizada"}
+                              style={{ flexShrink: 0, padding: "0.35rem 0.55rem", borderRadius: 7, border: "none", background: v.status === "concluido" ? "#dcfce7" : "#22c55e", color: v.status === "concluido" ? "#166534" : "#000", fontSize: "0.75rem", fontWeight: 700, cursor: v.status === "em_andamento" ? "pointer" : "not-allowed", opacity: v.status === "em_andamento" || v.status === "concluido" ? 1 : 0.5, whiteSpace: "nowrap" }}>
+                              {v.status === "concluido" ? "Confirmada" : "Confirmar"}
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
