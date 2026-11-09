@@ -1,9 +1,34 @@
-# Voluntariar
+# Voluntariar — conectando você a boas causas
 
-Plataforma demonstrativa que conecta voluntários a organizações e projetos
-sociais no Espírito Santo. A interface atual permite explorar organizações,
-consultar oportunidades, simular candidaturas e visualizar painéis de
-voluntário e de ONG.
+O sistema já está aberto no seu computador: acesse http://localhost:5173
+
+## Apresentação
+
+O **Voluntariar** é uma plataforma acadêmica que aproxima pessoas interessadas
+em fazer trabalho voluntário de organizações e projetos sociais do Espírito
+Santo. A proposta é tornar mais simples encontrar uma causa, conhecer as
+oportunidades disponíveis e dar o primeiro passo para contribuir com a
+comunidade.
+
+### O que a plataforma oferece
+
+- **Descoberta de organizações:** navegação por ONGs, suas áreas de atuação e
+  informações de localização.
+- **Oportunidades de voluntariado:** consulta a projetos, atividades, horários
+  e vagas disponíveis.
+- **Candidaturas:** uma demonstração do fluxo para manifestar interesse em um
+  projeto.
+- **Acompanhamento:** painéis demonstrativos para consultar candidaturas,
+  voluntariados e vínculos com organizações.
+
+O conteúdo apresentado contempla causas como saúde, educação, assistência
+social e meio ambiente, com foco em cidades capixabas. A experiência foi pensada
+para voluntários que buscam oportunidades e organizações que desejam divulgar
+suas iniciativas.
+
+> **Estado atual:** este é um protótipo funcional para demonstração. A
+> interface utiliza dados locais de exemplo; autenticação, candidaturas e
+> vínculos ainda não são persistidos no Supabase.
 
 ## Arquitetura
 
