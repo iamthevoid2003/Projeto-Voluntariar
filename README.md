@@ -26,14 +26,14 @@ social e meio ambiente, com foco em cidades capixabas. A experiência foi pensad
 para voluntários que buscam oportunidades e organizações que desejam divulgar
 suas iniciativas.
 
-> **Estado atual:** este é um protótipo funcional para demonstração. A
-> interface utiliza dados locais de exemplo; autenticação, candidaturas e
-> vínculos ainda não são persistidos no Supabase.
+> **Estado atual:** organizações, projetos, autenticação, perfis, vínculos e
+> candidaturas são carregados e persistidos no Supabase. Doações ainda são
+> apenas uma demonstração e não processam pagamentos.
 
 ## Arquitetura
 
 - `src/App.tsx`: navegação e estado da aplicação.
-- `src/pages/`: páginas de descoberta, autenticação demonstrativa e painéis.
+- `src/pages/`: páginas de descoberta, autenticação e painéis.
 - `src/components/`: componentes reutilizáveis de interface e cartões.
 - `src/data/mock-data.ts`: dados usados pelo protótipo.
 - `src/types/`: modelos do domínio e tipos do banco Supabase.
@@ -63,8 +63,26 @@ npm run preview
 ## Conexão com Supabase
 
 1. Crie um projeto no [Supabase](https://supabase.com/).
-2. No SQL Editor do projeto, execute [`database/schema.sql`](./database/schema.sql).
-3. Copie `.env.example` para `.env` e preencha as credenciais do projeto:
+2. O Supabase CLI está instalado como dependência local e `supabase init` já foi
+   executado. Para autenticar e vincular o projeto, execute no terminal:
+
+   ```powershell
+   npx supabase login
+   npx supabase link --project-ref seu-project-ref
+   ```
+
+   Se o PowerShell bloquear `npx.ps1`, execute o CLI pelo Node:
+
+   ```powershell
+   & "C:\Program Files\nodejs\node.exe" ".\node_modules\supabase\dist\supabase.js" login
+   & "C:\Program Files\nodejs\node.exe" ".\node_modules\supabase\dist\supabase.js" link --project-ref seu-project-ref
+   ```
+
+   O login pede um token de acesso pessoal, que pode ser criado em
+   [Access Tokens](https://supabase.com/dashboard/account/tokens). Cole-o apenas
+   no prompt local; não o salve no `.env` nem o compartilhe.
+3. No SQL Editor do projeto, execute [`database/schema.sql`](./database/schema.sql).
+4. Copie `.env.example` para `.env` e preencha as credenciais do projeto:
 
    ```env
    VITE_SUPABASE_URL=https://seu-projeto.supabase.co
@@ -76,8 +94,8 @@ npm run preview
    acesso é limitado pelas políticas RLS. Nunca use nem exponha a chave
    `service_role` no frontend.
 
-4. Reinicie o servidor de desenvolvimento após alterar `.env`.
-5. Use o cliente tipado nos serviços/repositórios:
+5. Reinicie o servidor de desenvolvimento após alterar `.env`.
+6. Use o cliente tipado nos serviços/repositórios:
 
    ```ts
    import { getSupabaseClient } from "./src/config/supabase";
@@ -107,16 +125,14 @@ npm run preview
 
 ## Estado da integração
 
-A interface permanece em modo demonstrativo e usa `src/data/mock-data.ts`;
-login, cadastro, candidatura e vínculo exibidos na tela ainda não chamam o
-Supabase. O cliente tipado, repositórios e caso de uso de candidatura fornecem
-a base para essa integração. Para produção, conecte os formulários ao Supabase
-Auth e substitua os dados simulados pelos repositórios antes de publicar.
+As telas de descoberta consultam organizações e projetos ativos no Supabase.
+Cadastro e login de voluntários/ONGs usam Supabase Auth; candidaturas,
+associações a ONGs, publicação de projetos e atualização de status persistem
+nas tabelas protegidas por RLS. Se a confirmação de e-mail estiver habilitada,
+confirme o endereço antes de entrar para concluir a criação do perfil/ONG.
 
 ## Próximos passos
 
-- Integrar autenticação, recuperação de senha e cadastro de perfis com Supabase
-  Auth.
-- Conectar as páginas às consultas e comandos dos repositórios.
+- Integrar recuperação de senha e processamento real de doações.
 - Adicionar testes para regras de negócio, políticas RLS e fluxos de interface.
 - Configurar CI, variáveis de ambiente e implantação contínua.

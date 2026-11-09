@@ -1,10 +1,11 @@
 export type VolunteerStatus = "pendente" | "aprovado" | "recusado" | "em_andamento" | "concluido";
+export type EntityId = number | string;
 export type Page = "home" | "ongs" | "projetos" | "ong-detalhe" | "login" | "dashboard" | "cadastro-ong" | "doar"
          | "login-escolha" | "login-voluntario" | "cadastro-voluntario" | "login-ong" | "cadastro-ong-full"
          | "dashboard-ong";
 
 export interface VolunteerProfile {
-  id: number;
+  id: EntityId;
   name: string;
   email: string;
   cpf: string;
@@ -14,7 +15,7 @@ export interface VolunteerProfile {
 }
 
 export interface Organization {
-  id: number;
+  id: EntityId;
   cnpj: string;
   name: string;
   city: string;
@@ -23,19 +24,19 @@ export interface Organization {
   website?: string;
   icon: string;
   image?: string;
-  memberCount: number;
+  memberCount?: number;
 }
 
 export interface OrganizationMember {
-  id: number;
-  userId: number;   // FK → VolunteerProfile
-  organizationId: number;       // FK → Organization
+  id: EntityId;
+  userId: EntityId;
+  organizationId: EntityId;
   isAdmin: boolean;
 }
 
 export interface Project {
-  id: number;
-  organizationId: number;       // FK → Organization
+  id: EntityId;
+  organizationId: EntityId;
   title: string;
   description: string;
   cause: string;
@@ -45,9 +46,9 @@ export interface Project {
 }
 
 export interface VolunteerApplication {
-  id: number;
-  userId: number;   // FK → VolunteerProfile
-  projectId: number;   // FK → Project
+  id: EntityId;
+  userId: EntityId;
+  projectId: EntityId;
   status: VolunteerStatus;
   appliedAt: string;
   message: string;

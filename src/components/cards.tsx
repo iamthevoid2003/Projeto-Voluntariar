@@ -16,7 +16,7 @@ export function OrganizationCard({ organization, onClick, extraAction }: { organ
       <div style={{ padding: "1.25rem" }}>
         <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "0.5rem" }}>
           <AreaBadge area={organization.cause} />
-          <Badge label={`👥 ${organization.memberCount}`} />
+          {organization.memberCount !== undefined && <Badge label={`👥 ${organization.memberCount}`} />}
         </div>
         <h3 style={{ fontSize: "1.05rem", fontWeight: 700, marginBottom: "0.35rem" }}>{organization.name}</h3>
         <p style={{ color: "#4b5563", fontSize: "0.88rem", marginBottom: "0.5rem", lineHeight: 1.5 }}>{organization.description.slice(0, 90)}...</p>
@@ -30,8 +30,8 @@ export function OrganizationCard({ organization, onClick, extraAction }: { organ
   );
 }
 
-export function ProjectCard({ project, hasApplied, onApply }: { project: Project; hasApplied: boolean; onApply: () => void }) {
-  const organization = getOrganization(project.organizationId);
+export function ProjectCard({ project, organizations, hasApplied, onApply }: { project: Project; organizations: Organization[]; hasApplied: boolean; onApply: () => void }) {
+  const organization = getOrganization(project.organizationId, organizations);
   return (
     <div style={{ background: "#fff", borderRadius: 14, overflow: "hidden", border: "1px solid #e5e7eb" }}>
       <div style={{ padding: "1.25rem" }}>
@@ -48,8 +48,8 @@ export function ProjectCard({ project, hasApplied, onApply }: { project: Project
   );
 }
 
-export function ProjectRow({ project, hasApplied, onApply }: { project: Project; hasApplied: boolean; onApply: () => void }) {
-  const organization = getOrganization(project.organizationId);
+export function ProjectRow({ project, organizations, hasApplied, onApply }: { project: Project; organizations: Organization[]; hasApplied: boolean; onApply: () => void }) {
+  const organization = getOrganization(project.organizationId, organizations);
   const areaIcons: Record<string, string> = { "Saúde": "🏥", "Assistência Social": "🤝", "Meio Ambiente": "🌿", "Educação": "📚" };
   return (
     <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e5e7eb" }}>

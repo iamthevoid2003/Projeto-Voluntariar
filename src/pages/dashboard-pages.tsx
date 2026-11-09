@@ -1,7 +1,6 @@
 import { useState } from "react";
 import type React from "react";
-import type { Organization, OrganizationDashboardTab, OrganizationMember, Project, VolunteerApplication, VolunteerDashboardTab, VolunteerProfile, VolunteerStatus, PageNavigation } from "../types/models";
-import { projects } from "../data/mock-data";
+import type { EntityId, Organization, OrganizationDashboardTab, OrganizationMember, Project, VolunteerApplication, VolunteerDashboardTab, VolunteerProfile, VolunteerStatus, PageNavigation } from "../types/models";
 import { getOrganization, getProject } from "../utils/presentation";
 import { Badge, BtnPrimary, BtnSm, FormGroup, SectionDivider, StatusBadge } from "../components/ui";
 import { statusLabel, statusStyle } from "../utils/presentation";
@@ -14,7 +13,8 @@ export const statusOportunidade: Record<string, { bg: string; color: string; lab
 
 export const statusOportunidades = ["ativa", "ativa", "encerrada", "rascunho", "ativa", "ativa", "ativa", "ativa", "ativa"];
 
-export function VolunteerDashboardPage({ profile, myApplications, myOrganizationMembers, dashTab, setDashTab, nav, onLogout }: {
+export function VolunteerDashboardPage({ profile, organizations, projects, myApplications, myOrganizationMembers, dashTab, setDashTab, nav, onLogout }: {
+  organizations: Organization[]; projects: Project[];
   profile: VolunteerProfile; myApplications: VolunteerApplication[]; myOrganizationMembers: OrganizationMember[];
   dashTab: VolunteerDashboardTab; setDashTab: (tab: VolunteerDashboardTab) => void; nav: PageNavigation; onLogout: () => void;
 }) {
@@ -99,8 +99,8 @@ export function VolunteerDashboardPage({ profile, myApplications, myOrganization
                 {myApplications.length === 0 ? (
                   <p style={{ color: "#9ca3af", textAlign: "center", padding: "2rem" }}>Nenhum voluntariado ainda. Explore os projetos!</p>
                 ) : myApplications.map(v => {
-                  const p = getProject(v.projectId);
-                  const o = getOrganization(p.organizationId);
+                  const p = getProject(v.projectId, projects);
+                  const o = getOrganization(p.organizationId, organizations);
                   return (
                     <div key={v.id} style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "0.75rem 0", borderBottom: "1px solid #f3f4f6" }}>
                       <div style={{ width: 40, height: 40, borderRadius: 10, background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem", flexShrink: 0 }}>{o.icon}</div>
@@ -126,7 +126,7 @@ export function VolunteerDashboardPage({ profile, myApplications, myOrganization
                 {myOrganizationMembers.length === 0 ? (
                   <p style={{ color: "#9ca3af", textAlign: "center", padding: "2rem" }}>Você ainda não é membro de nenhuma ONG.</p>
                 ) : myOrganizationMembers.map(m => {
-                  const o = getOrganization(m.organizationId);
+                  const o = getOrganization(m.organizationId, organizations);
                   return (
                     <div key={m.id} style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "0.75rem 0", borderBottom: "1px solid #f3f4f6" }}>
                       <div style={{ width: 40, height: 40, borderRadius: 10, background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem", flexShrink: 0 }}>{o.icon}</div>
@@ -154,11 +154,13 @@ export function VolunteerDashboardPage({ profile, myApplications, myOrganization
 
 // ── CARD COMPONENTS ───────────────────────────────────────────────────────
 
-export function OrganizationDashboardPage({ organization, applications, organizationTab, setOrganizationTab, nav, onLogout, onStatusChange }: {
+export function OrganizationDashboardPage({ organization, projects, applications, organizationTab, setOrganizationTab, nav, onLogout, onStatusChange, onCreateProject }: {
+  projects: Project[];
   organization: Organization; applications: VolunteerApplication[]; organizationTab: OrganizationDashboardTab; setOrganizationTab: (tab: OrganizationDashboardTab) => void;
-  nav: PageNavigation; onLogout: () => void; onStatusChange: (id: number, s: VolunteerStatus) => void;
+  nav: PageNavigation; onLogout: () => void; onStatusChange: (id: EntityId, s: VolunteerStatus) => void;
+  onCreateProject: (project: Pick<Project, "title" | "description" | "cause" | "city" | "slots" | "schedule">) => Promise<boolean>;
 }) {
-  const organizationProjects = projects.filter(project => project.organizationId === organization.id);
+  const organizationProjects = projects.filter(project => String(project.organizationId) === String(organization.id));
   const inscricoes = applications.filter(v => organizationProjects.some(p => p.id === v.projectId));
 
   const navItems = [
@@ -203,9 +205,9 @@ export function OrganizationDashboardPage({ organization, applications, organiza
                 <h1 style={{ fontSize: "1.4rem", fontWeight: 900, marginBottom: "0.25rem" }}>Painel da ONG 🏢</h1>
                 <p style={{ color: "#6b7280", fontSize: "0.9rem" }}>Bem-vinda ao Voluntariar. Gerencie suas ações e conecte-se com novos voluntários.</p>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "1rem", marginBottom: "2rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: "1rem", marginBottom: "2rem" }}>
                 {[
-                  { n: organization.memberCount, label: "Total de voluntários", icon: "👥" },
+                  ...(organization.memberCount === undefined ? [] : [{ n: organization.memberCount, label: "Total de voluntários", icon: "👥" }]),
                   { n: organizationProjects.length, label: "Oportunidades publicadas", icon: "📋" },
                   { n: inscricoes.length, label: "Inscrições recebidas", icon: "📩" },
                   { n: inscricoes.filter(v => v.status === "concluido").length, label: "Ações realizadas", icon: "✅" },
@@ -254,16 +256,14 @@ export function OrganizationDashboardPage({ organization, applications, organiza
                         <span key={h} style={{ fontSize: "0.7rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</span>
                       ))}
                     </div>
-                    {inscricoes.map((v, i) => {
-                      const p = getProject(v.projectId);
-                      const nomes = ["Marcos Lima", "Beatriz Costa", "Rafael Souza", "Carla Mendes", "João Pedro"];
-                      const nome = nomes[i % nomes.length];
+                    {inscricoes.map(v => {
+                      const p = getProject(v.projectId, projects);
                       const sstyle = statusStyle[v.status];
                       return (
                         <div key={v.id} style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr 0.85fr 0.95fr 2fr", gap: "0.75rem", padding: "0.75rem", borderBottom: "1px solid #f3f4f6", alignItems: "center" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.9rem", flexShrink: 0 }}>👤</div>
-                            <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>{nome}</span>
+                            <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>Voluntário</span>
                           </div>
                           <span style={{ fontSize: "0.82rem", color: "#374151" }}>{p.title}</span>
                           <span style={{ fontSize: "0.8rem", color: "#9ca3af" }}>{v.appliedAt}</span>
@@ -295,7 +295,17 @@ export function OrganizationDashboardPage({ organization, applications, organiza
           )}
 
           {/* Criar oportunidade */}
-          {organizationTab === "create" && <OpportunityForm onPublicar={() => setOrganizationTab("opportunities")} />}
+          {organizationTab === "create" && (
+            <OpportunityForm
+              initialCause={organization.cause}
+              initialCity={organization.city}
+              onPublicar={async project => {
+                const created = await onCreateProject(project);
+                if (created) setOrganizationTab("opportunities");
+                return created;
+              }}
+            />
+          )}
 
           {/* Configurações */}
           {organizationTab === "settings" && (
@@ -349,51 +359,58 @@ export function OpportunitiesTable({ organizationProjects, statusList }: { organ
   );
 }
 
-export function OpportunityForm({ onPublicar }: { onPublicar: () => void }) {
-  const [formato, setFormato] = useState<"presencial" | "online" | "hibrido">("presencial");
-  const fi = (ph: string, type = "text") => (
-    <input type={type} placeholder={ph} style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit" }} />
-  );
+export function OpportunityForm({ initialCause, initialCity, onPublicar }: {
+  initialCause: string;
+  initialCity: string;
+  onPublicar: (project: Pick<Project, "title" | "description" | "cause" | "city" | "slots" | "schedule">) => Promise<boolean>;
+}) {
+  const [details, setDetails] = useState({
+    title: "", description: "", cause: initialCause, city: initialCity, slots: "1", schedule: "",
+  });
+  const [errorMessage, setErrorMessage] = useState("");
+  const update = (key: keyof typeof details, value: string) => setDetails(current => ({ ...current, [key]: value }));
+  const inputStyle = { width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit" };
+  const submit = async () => {
+    const slots = Number(details.slots);
+    if (!details.title.trim() || !details.description.trim() || !details.city.trim() || !details.schedule.trim() || !Number.isInteger(slots) || slots < 1) {
+      setErrorMessage("Preencha todos os campos e informe pelo menos uma vaga.");
+      return;
+    }
+    setErrorMessage("");
+    await onPublicar({ ...details, slots });
+  };
   return (
     <div>
       <h2 style={{ fontWeight: 800, fontSize: "1.3rem", marginBottom: "1.5rem" }}>Criar oportunidade de voluntariado</h2>
       <div style={{ background: "#fff", borderRadius: 12, padding: "2rem", border: "1px solid #e5e7eb" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          <FormGroup label="Nome da oportunidade">{fi("Ex: Plantio de mudas nativas")}</FormGroup>
+          <FormGroup label="Nome da oportunidade">
+            <input value={details.title} onChange={event => update("title", event.target.value)} placeholder="Ex: Plantio de mudas nativas" style={inputStyle} />
+          </FormGroup>
           <FormGroup label="Descrição">
-            <textarea rows={4} placeholder="Descreva a oportunidade em detalhes..."
-              style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit", resize: "vertical" }} />
+            <textarea value={details.description} onChange={event => update("description", event.target.value)} rows={4} placeholder="Descreva a oportunidade em detalhes..."
+              style={{ ...inputStyle, resize: "vertical" }} />
           </FormGroup>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
             <FormGroup label="Categoria">
-              <select style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", background: "#fff", fontFamily: "inherit" }}>
-                {["Saúde", "Assistência Social", "Meio Ambiente", "Educação"].map(a => <option key={a}>{a}</option>)}
+              <select value={details.cause} onChange={event => update("cause", event.target.value)} style={{ ...inputStyle, background: "#fff" }}>
+                {["Saúde", "Assistência Social", "Meio Ambiente", "Educação", "Cultura", "Tecnologia Social"].map(a => <option key={a}>{a}</option>)}
               </select>
             </FormGroup>
-            <FormGroup label="Número de vagas">{fi("Ex: 10", "number")}</FormGroup>
+            <FormGroup label="Número de vagas">
+              <input type="number" min={1} step={1} value={details.slots} onChange={event => update("slots", event.target.value)} style={inputStyle} />
+            </FormGroup>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-            <FormGroup label="Data">{fi("DD/MM/AAAA", "date")}</FormGroup>
-            <FormGroup label="Horário">{fi("HH:MM", "time")}</FormGroup>
+            <FormGroup label="Cidade">
+              <input value={details.city} onChange={event => update("city", event.target.value)} placeholder="Cidade, UF" style={inputStyle} />
+            </FormGroup>
+            <FormGroup label="Horários e formato">
+              <input value={details.schedule} onChange={event => update("schedule", event.target.value)} placeholder="Ex: sábados, 9h às 12h" style={inputStyle} />
+            </FormGroup>
           </div>
-          <FormGroup label="Local">{fi("Endereço ou link (se online)")}</FormGroup>
-          <FormGroup label="Formato">
-            <div style={{ display: "flex", gap: "0.75rem" }}>
-              {(["presencial", "online", "hibrido"] as const).map(f => (
-                <button key={f} onClick={() => setFormato(f)}
-                  style={{ flex: 1, padding: "0.65rem", borderRadius: 9, border: `2px solid ${formato === f ? "#22c55e" : "#e5e7eb"}`, background: formato === f ? "#dcfce7" : "#fff", fontWeight: 600, cursor: "pointer", fontSize: "0.85rem", color: formato === f ? "#166534" : "#374151", textTransform: "capitalize" }}>
-                  {f === "hibrido" ? "Híbrido" : f.charAt(0).toUpperCase() + f.slice(1)}
-                </button>
-              ))}
-            </div>
-          </FormGroup>
-          <FormGroup label="Requisitos">{fi("Ex: Maior de 18 anos, disponibilidade aos sábados")}</FormGroup>
-          <FormGroup label="Imagem da oportunidade">
-            <div style={{ border: "2px dashed #e5e7eb", borderRadius: 10, padding: "1.5rem", textAlign: "center", color: "#9ca3af", cursor: "pointer", fontSize: "0.9rem" }}>
-              📷 Clique para fazer upload
-            </div>
-          </FormGroup>
-          <BtnPrimary onClick={onPublicar} full>Publicar oportunidade</BtnPrimary>
+          {errorMessage && <p role="alert" style={{ color: "#991b1b", fontSize: "0.85rem" }}>{errorMessage}</p>}
+          <BtnPrimary onClick={() => void submit()} full>Publicar oportunidade</BtnPrimary>
         </div>
       </div>
     </div>

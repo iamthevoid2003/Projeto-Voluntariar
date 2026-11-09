@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import type React from "react";
-import type { Organization, OrganizationMember, OrganizationDashboardTab, Page, Project, VolunteerApplication, VolunteerDashboardTab, VolunteerProfile } from "./types/models";
-import { currentUser, initialApplications, initialMembers, organizations, projects } from "./data/mock-data";
+import type { EntityId, Organization, OrganizationMember, OrganizationDashboardTab, Page, Project, VolunteerApplication, VolunteerDashboardTab, VolunteerProfile } from "./types/models";
 import { getOrganization } from "./utils/presentation";
 import { BtnPrimary, BtnSecondary, FormGroup, ModalOverlay } from "./components/ui";
 import { HomePage, OrganizationsPage, ProjectsPage, OrganizationDetailPage, DonationPage } from "./pages/discovery-pages";
-import { LoginPage, AccountTypePage, VolunteerLoginPage, VolunteerRegistrationPage, OrganizationLoginPage, OrganizationRegistrationPage } from "./pages/auth-pages";
+import { AccountTypePage, VolunteerLoginPage, VolunteerRegistrationPage, OrganizationLoginPage, OrganizationRegistrationPage } from "./pages/auth-pages";
 import { VolunteerDashboardPage, OrganizationDashboardPage } from "./pages/dashboard-pages";
+import { applyToProject } from "./services/volunteering.service";
+import { loadMyApplications, loadOrganizationApplications, registerAccount, restoreSession, signIn, signOut } from "./services/auth.service";
+import { joinOrganization as saveOrganizationMembership, listOrganizationMembers, listOrganizations, organizationFromRecord } from "./repositories/organization.repository";
+import { createProject, listActiveProjects, projectFromRecord } from "./repositories/project.repository";
+import { updateApplicationStatus } from "./repositories/volunteer-application.repository";
 
 export default function App() {
   const [page, setPage] = useState<Page>("home");
@@ -14,13 +18,15 @@ export default function App() {
   const lastScrollY = useRef(0);
   const [selectedOrganization, setSelectedOrganization] = useState<Organization | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-  const [applications, setApplications] = useState<VolunteerApplication[]>(initialApplications);
-  const [organizationMembers, setOrganizationMembers] = useState<OrganizationMember[]>(initialMembers);
-  const [loggedIn, setLoggedIn] = useState(true);
-  // ── novo: dois tipos de usuário ─────────────────────────────────────────
-  const [accountType, setAccountType] = useState<"voluntario" | "ong" | null>("voluntario");
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [applications, setApplications] = useState<VolunteerApplication[]>([]);
+  const [organizationMembers, setOrganizationMembers] = useState<OrganizationMember[]>([]);
+  const [profile, setProfile] = useState<VolunteerProfile | null>(null);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [accountType, setAccountType] = useState<"voluntario" | "ong" | null>(null);
   const [organizationLoggedIn, setOrganizationLoggedIn] = useState(false);
-  const [activeOrganizationId, setActiveOrganizationId] = useState<number>(1);
+  const [activeOrganization, setActiveOrganization] = useState<Organization | null>(null);
   const [organizationTab, setOrganizationTab] = useState<OrganizationDashboardTab>("dashboard");
   // ────────────────────────────────────────────────────────────────────────
   const [menuOpen, setMenuOpen] = useState(false);
@@ -30,8 +36,54 @@ export default function App() {
   const [applicationMessage, setApplicationMessage] = useState("");
   const [toast, setToast] = useState("");
   const [causeFilter, setCauseFilter] = useState("Todas");
-  const [authTab, setAuthTab] = useState<"login" | "register">("login");
   const [dashTab, setDashTab] = useState<VolunteerDashboardTab>("overview");
+  const [loadingData, setLoadingData] = useState(true);
+  const [loadError, setLoadError] = useState("");
+
+  async function refreshPublicData() {
+    const [organizationRows, projectRows] = await Promise.all([listOrganizations(), listActiveProjects()]);
+    setOrganizations(organizationRows.map(record => organizationFromRecord(record)));
+    setProjects(projectRows.map(projectFromRecord));
+  }
+
+  async function refreshAccountData(type: "voluntario" | "ong") {
+    if (type === "voluntario") {
+      const [applicationRows, memberRows] = await Promise.all([loadMyApplications(), listOrganizationMembers()]);
+      setApplications(applicationRows);
+      setOrganizationMembers(memberRows.map(member => ({
+        id: member.id,
+        userId: member.user_id,
+        organizationId: member.organization_id,
+        isAdmin: member.is_admin,
+      })));
+    } else {
+      setApplications(await loadOrganizationApplications());
+      setOrganizationMembers([]);
+    }
+  }
+
+  useEffect(() => {
+    let active = true;
+    async function initialize() {
+      try {
+        await refreshPublicData();
+        const session = await restoreSession();
+        if (!active || !session) return;
+        setProfile(session.profile);
+        setAccountType(session.accountType);
+        setLoggedIn(session.accountType === "voluntario");
+        setOrganizationLoggedIn(session.accountType === "ong");
+        setActiveOrganization(session.organization);
+        await refreshAccountData(session.accountType);
+      } catch (error) {
+        if (active) setLoadError(error instanceof Error ? error.message : "Não foi possível carregar os dados do Supabase.");
+      } finally {
+        if (active) setLoadingData(false);
+      }
+    }
+    void initialize();
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -57,59 +109,121 @@ export default function App() {
   }
 
   function openApplication(p: Project) {
+    if (!profile || accountType !== "voluntario") {
+      showToast("Entre como voluntário para se candidatar.");
+      nav("login-voluntario");
+      return;
+    }
+    if (hasApplied(p.id)) {
+      showToast("Você já se candidatou a este projeto.");
+      return;
+    }
     setModalProject(p);
     setApplicationMessage("");
     setModal("candidatura");
   }
 
   function openMembership(o: Organization) {
+    if (!profile || accountType !== "voluntario") {
+      showToast("Entre como voluntário para se vincular a uma ONG.");
+      nav("login-voluntario");
+      return;
+    }
     setModalOrganization(o);
     setModal("membro");
   }
 
-  function submitApplication() {
+  async function submitApplication() {
     if (!modalProject) return;
-    const alreadyApplied = applications.some(v => v.userId === currentUser.id && v.projectId === modalProject.id);
-    if (!alreadyApplied) {
-      setApplications(prev => [...prev, {
-        id: prev.length + 10,
-        userId: currentUser.id,
-        projectId: modalProject.id,
-        status: "pendente",
-        appliedAt: new Date().toISOString().split("T")[0],
-        message: applicationMessage,
-      }]);
+    try {
+      await applyToProject(String(modalProject.id), applicationMessage);
+      setApplications(await loadMyApplications());
+      setModal(null);
+      showToast("Candidatura enviada com sucesso!");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Não foi possível enviar a candidatura.");
     }
-    setModal(null);
-    showToast("Candidatura enviada com sucesso! 🎉");
   }
 
-  function joinOrganization() {
+  async function joinOrganization() {
     if (!modalOrganization) return;
-    const alreadyMember = organizationMembers.some(m => m.userId === currentUser.id && m.organizationId === modalOrganization.id);
-    if (!alreadyMember) {
-      setOrganizationMembers(prev => [...prev, {
-        id: prev.length + 10,
-        userId: currentUser.id,
-        organizationId: modalOrganization.id,
-        isAdmin: false,
-      }]);
+    try {
+      await saveOrganizationMembership(String(modalOrganization.id));
+      const members = await listOrganizationMembers();
+      setOrganizationMembers(members.map(member => ({
+        id: member.id,
+        userId: member.user_id,
+        organizationId: member.organization_id,
+        isAdmin: member.is_admin,
+      })));
+      setModal(null);
+      showToast(`Você agora é membro da ${modalOrganization.name}!`);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Não foi possível entrar na organização.");
     }
-    setModal(null);
-    showToast(`Você agora é membro da ${modalOrganization.name}! 🎉`);
   }
 
-  function hasApplied(projectId: number) {
-    return applications.some(application => application.userId === currentUser.id && application.projectId === projectId);
+  function hasApplied(projectId: EntityId) {
+    return applications.some(application =>
+      application.userId === profile?.id && String(application.projectId) === String(projectId),
+    );
   }
 
-  function isMember(organizationId: number) {
-    return organizationMembers.some(member => member.userId === currentUser.id && member.organizationId === organizationId);
+  function isMember(organizationId: EntityId) {
+    return organizationMembers.some(member => String(member.organizationId) === String(organizationId));
   }
 
   const filteredProjects = causeFilter === "Todas" ? projects : projects.filter(p => p.cause === causeFilter);
-  const myApplications = applications.filter(v => v.userId === currentUser.id);
-  const myOrganizationMembers = organizationMembers.filter(m => m.userId === currentUser.id);
+  const myApplications = applications;
+  const myOrganizationMembers = organizationMembers;
+
+  async function handleLogin(email: string, password: string, type: "voluntario" | "ong") {
+    try {
+      const result = await signIn(email, password, type);
+      setProfile(result.profile);
+      setAccountType(type);
+      setLoggedIn(type === "voluntario");
+      setOrganizationLoggedIn(type === "ong");
+      setActiveOrganization(result.organization);
+      await refreshAccountData(type);
+      nav(type === "ong" ? "dashboard-ong" : "dashboard");
+      showToast(type === "ong" ? "Bem-vinda ao painel da ONG!" : "Bem-vindo, voluntário!");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Não foi possível entrar.");
+    }
+  }
+
+  async function handleRegistration(details: Parameters<typeof registerAccount>[0]) {
+    try {
+      const hasSession = await registerAccount(details);
+      if (!hasSession) {
+        nav(details.accountType === "ong" ? "login-ong" : "login-voluntario");
+        showToast("Conta criada. Confirme seu e-mail e depois entre.");
+        return;
+      }
+      await handleLogin(details.email, details.password, details.accountType);
+      if (details.accountType === "ong") await refreshPublicData();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Não foi possível concluir o cadastro.");
+    }
+  }
+
+  async function handleLogout() {
+    try {
+      await signOut();
+      setProfile(null);
+      setAccountType(null);
+      setLoggedIn(false);
+      setOrganizationLoggedIn(false);
+      setActiveOrganization(null);
+      setApplications([]);
+      setOrganizationMembers([]);
+      nav("home");
+      showToast("Até logo!");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Não foi possível sair da conta.");
+    }
+  }
 
   return (
     <div style={{ fontFamily: "'Inter', system-ui, sans-serif", background: "#fff", color: "#111827", minHeight: "100vh" }}>
@@ -170,27 +284,47 @@ export default function App() {
 
       {/* ── PAGES ───────────────────────────────────────────────────── */}
       <div style={{ paddingTop: 64 }}>
-        {page === "home"       && <HomePage nav={nav} onApply={openApplication} hasApplied={hasApplied} />}
-        {page === "ongs"       && <OrganizationsPage nav={nav} isMember={isMember} onJoin={openMembership} />}
-        {page === "projetos"   && <ProjectsPage causeFilter={causeFilter} setCauseFilter={setCauseFilter} filteredProjects={filteredProjects} nav={nav} onApply={openApplication} hasApplied={hasApplied} />}
-        {page === "doar"       && <DonationPage showToast={showToast} />}
+        {loadError && <p role="alert" style={{ maxWidth: 1100, margin: "1rem auto", padding: "1rem", color: "#991b1b", background: "#fee2e2", borderRadius: 8 }}>{loadError}</p>}
+        {loadingData && <p style={{ textAlign: "center", padding: "3rem", color: "#6b7280" }}>Conectando ao Supabase...</p>}
+        {page === "home" && !loadingData && <HomePage organizations={organizations} projects={projects} nav={nav} onApply={openApplication} hasApplied={hasApplied} />}
+        {page === "ongs" && !loadingData && <OrganizationsPage organizations={organizations} nav={nav} isMember={isMember} onJoin={openMembership} />}
+        {page === "projetos" && !loadingData && <ProjectsPage organizations={organizations} causeFilter={causeFilter} setCauseFilter={setCauseFilter} filteredProjects={filteredProjects} nav={nav} onApply={openApplication} hasApplied={hasApplied} />}
+        {page === "doar" && !loadingData && <DonationPage organizations={organizations} showToast={showToast} />}
         {page === "ong-detalhe" && selectedOrganization && (
-          <OrganizationDetailPage organization={selectedOrganization} nav={nav} onApply={openApplication} hasApplied={hasApplied} isMember={isMember} onJoin={openMembership} />
+          <OrganizationDetailPage organization={selectedOrganization} organizations={organizations} projects={projects} nav={nav} onApply={openApplication} hasApplied={hasApplied} isMember={isMember} onJoin={openMembership} />
         )}
-        {page === "login"      && <LoginPage nav={nav} authTab={authTab} setAuthTab={setAuthTab} onLogin={() => { setLoggedIn(true); nav("dashboard"); showToast("Bem-vindo de volta! 🎉"); }} onRegister={() => { setLoggedIn(true); nav("dashboard"); showToast("Cadastro realizado! 🚀"); }} />}
-        {page === "dashboard"  && loggedIn && (
-          <VolunteerDashboardPage profile={currentUser} myApplications={myApplications} myOrganizationMembers={myOrganizationMembers} dashTab={dashTab} setDashTab={setDashTab} nav={nav} onLogout={() => { setLoggedIn(false); setAccountType(null); nav("home"); showToast("Até logo! 👋"); }} />
+        {page === "login" && <AccountTypePage nav={nav} />}
+        {page === "dashboard" && loggedIn && profile && (
+          <VolunteerDashboardPage profile={profile} organizations={organizations} projects={projects} myApplications={myApplications} myOrganizationMembers={myOrganizationMembers} dashTab={dashTab} setDashTab={setDashTab} nav={nav} onLogout={() => void handleLogout()} />
         )}
         {/* ── NOVOS: fluxo dois tipos de usuário ─────────────────────────── */}
         {page === "login-escolha"      && <AccountTypePage nav={nav} />}
-        {page === "login-voluntario"   && <VolunteerLoginPage nav={nav} onLogin={() => { setLoggedIn(true); setAccountType("voluntario"); setOrganizationLoggedIn(false); nav("dashboard"); showToast("Bem-vindo, voluntário! 🎉"); }} />}
-        {page === "cadastro-voluntario"&& <VolunteerRegistrationPage nav={nav} onSuccess={() => { setLoggedIn(true); setAccountType("voluntario"); setOrganizationLoggedIn(false); nav("dashboard"); showToast("Conta criada com sucesso! 🚀"); }} />}
-        {page === "login-ong"          && <OrganizationLoginPage nav={nav} onLogin={(id) => { setOrganizationLoggedIn(true); setLoggedIn(false); setAccountType("ong"); setActiveOrganizationId(id); nav("dashboard-ong"); showToast("Bem-vinda ao Voluntariar! 🏢"); }} />}
-        {page === "cadastro-ong-full"  && <OrganizationRegistrationPage nav={nav} onSuccess={() => { showToast("ONG cadastrada! Aguarde verificação. ✅"); nav("login-ong"); }} />}
-        {page === "dashboard-ong"      && organizationLoggedIn && (
-          <OrganizationDashboardPage organization={getOrganization(activeOrganizationId)} applications={applications} organizationTab={organizationTab} setOrganizationTab={setOrganizationTab} nav={nav}
-            onLogout={() => { setOrganizationLoggedIn(false); setAccountType(null); nav("home"); showToast("Até logo! 👋"); }}
-            onStatusChange={(volId, status) => setApplications(prev => prev.map(v => v.id === volId ? { ...v, status } : v))}
+        {page === "login-voluntario" && <VolunteerLoginPage nav={nav} onLogin={(email, password) => void handleLogin(email, password, "voluntario")} />}
+        {page === "cadastro-voluntario" && <VolunteerRegistrationPage nav={nav} onSuccess={details => void handleRegistration(details)} />}
+        {page === "login-ong" && <OrganizationLoginPage nav={nav} onLogin={(email, password) => void handleLogin(email, password, "ong")} />}
+        {page === "cadastro-ong-full" && <OrganizationRegistrationPage nav={nav} onSuccess={details => void handleRegistration(details)} />}
+        {page === "dashboard-ong" && organizationLoggedIn && activeOrganization && (
+          <OrganizationDashboardPage organization={activeOrganization} projects={projects} applications={applications} organizationTab={organizationTab} setOrganizationTab={setOrganizationTab} nav={nav}
+            onLogout={() => void handleLogout()}
+            onCreateProject={async project => {
+              try {
+                const created = await createProject(String(activeOrganization.id), project);
+                setProjects(previous => [created, ...previous]);
+                showToast("Oportunidade publicada com sucesso.");
+              } catch (error) {
+                showToast(error instanceof Error ? error.message : "Não foi possível publicar a oportunidade.");
+                return false;
+              }
+              return true;
+            }}
+            onStatusChange={async (applicationId, status) => {
+              try {
+                await updateApplicationStatus(String(applicationId), status);
+                setApplications(await loadOrganizationApplications());
+              } catch (error) {
+                showToast(error instanceof Error ? error.message : "Não foi possível atualizar a candidatura.");
+              }
+            }}
           />
         )}
       </div>
@@ -223,7 +357,7 @@ export default function App() {
         <ModalOverlay onClose={() => setModal(null)}>
           <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>💼</div>
           <h2 style={{ fontSize: "1.3rem", fontWeight: 800, marginBottom: "0.5rem" }}>Candidatar-se ao projeto</h2>
-          <p style={{ color: "#4b5563", fontSize: "0.9rem", marginBottom: "1.25rem" }}>{modalProject.title} · {getOrganization(modalProject.organizationId).name}</p>
+          <p style={{ color: "#4b5563", fontSize: "0.9rem", marginBottom: "1.25rem" }}>{modalProject.title} · {getOrganization(modalProject.organizationId, organizations).name}</p>
           <FormGroup label="Por que quer participar?">
             <textarea value={applicationMessage} onChange={e => setApplicationMessage(e.target.value)} rows={3}
               placeholder="Conte sua motivação e disponibilidade..."

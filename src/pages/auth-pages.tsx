@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { PageNavigation } from "../types/models";
+import type { RegistrationDetails } from "../services/auth.service";
 import { BtnPrimary, FormGroup, FormInput, SectionDivider } from "../components/ui";
 
 export function LoginPage({ nav, authTab, setAuthTab, onLogin, onRegister }: {
@@ -123,7 +124,9 @@ export function AccountTypePage({ nav }: { nav: PageNavigation }) {
 
 // ── 2. LOGIN DO VOLUNTÁRIO ────────────────────────────────────────────────
 
-export function VolunteerLoginPage({ nav, onLogin }: { nav: PageNavigation; onLogin: () => void }) {
+export function VolunteerLoginPage({ nav, onLogin }: { nav: PageNavigation; onLogin: (email: string, password: string) => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   return (
     <div style={{ minHeight: "calc(100vh - 64px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem", background: "#f9fafb" }}>
       <div style={{ maxWidth: 440, width: "100%", background: "#fff", borderRadius: 16, padding: "2.5rem", border: "1px solid #e5e7eb", boxShadow: "0 4px 24px #0000000a" }}>
@@ -135,11 +138,11 @@ export function VolunteerLoginPage({ nav, onLogin }: { nav: PageNavigation; onLo
           <h1 style={{ fontSize: "1.6rem", fontWeight: 900 }}>Entrar como Voluntário</h1>
           <p style={{ color: "#6b7280", fontSize: "0.9rem" }}>Acesse sua conta e encontre oportunidades</p>
         </div>
-        <FormGroup label="CPF ou E-mail">
-          <input placeholder="CPF ou E-mail" style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit" }} />
+        <FormGroup label="E-mail">
+          <input type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="seu@email.com" style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit" }} />
         </FormGroup>
         <FormGroup label="Senha">
-          <input type="password" placeholder="Senha" style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit" }} />
+          <input type="password" value={password} onChange={event => setPassword(event.target.value)} placeholder="Senha" style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit" }} />
         </FormGroup>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", fontSize: "0.85rem" }}>
           <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", color: "#374151", cursor: "pointer" }}>
@@ -147,7 +150,7 @@ export function VolunteerLoginPage({ nav, onLogin }: { nav: PageNavigation; onLo
           </label>
           <span style={{ color: "#22c55e", cursor: "pointer" }}>Esqueci minha senha</span>
         </div>
-        <BtnPrimary onClick={onLogin} full>Entrar</BtnPrimary>
+        <BtnPrimary onClick={() => onLogin(email, password)} full>Entrar</BtnPrimary>
         <p style={{ textAlign: "center", color: "#9ca3af", fontSize: "0.85rem", marginTop: "1.25rem" }}>
           Ainda não possui uma conta?{" "}
           <span onClick={() => nav("cadastro-voluntario")} style={{ color: "#22c55e", cursor: "pointer", fontWeight: 600 }}>Criar conta de Voluntário</span>
@@ -159,11 +162,11 @@ export function VolunteerLoginPage({ nav, onLogin }: { nav: PageNavigation; onLo
 
 // ── 3. CADASTRO DO VOLUNTÁRIO ─────────────────────────────────────────────
 
-export function VolunteerRegistrationPage({ nav, onSuccess }: { nav: PageNavigation; onSuccess: () => void }) {
+export function VolunteerRegistrationPage({ nav, onSuccess }: { nav: PageNavigation; onSuccess: (details: RegistrationDetails) => void }) {
   const [termos, setTermos] = useState(false);
-  const fi = (ph: string, type = "text") => (
-    <input type={type} placeholder={ph} style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit" }} />
-  );
+  const [details, setDetails] = useState({ fullName: "", cpf: "", city: "", email: "", password: "", confirmation: "" });
+  const [formError, setFormError] = useState("");
+  const update = (key: keyof typeof details, value: string) => setDetails(current => ({ ...current, [key]: value }));
   return (
     <div style={{ minHeight: "calc(100vh - 64px)", background: "#f9fafb", padding: "2.5rem 1.5rem" }}>
       <div style={{ maxWidth: 520, margin: "0 auto", background: "#fff", borderRadius: 16, padding: "2.5rem", border: "1px solid #e5e7eb", boxShadow: "0 4px 24px #0000000a" }}>
@@ -175,22 +178,42 @@ export function VolunteerRegistrationPage({ nav, onSuccess }: { nav: PageNavigat
           <h1 style={{ fontSize: "1.6rem", fontWeight: 900 }}>Criar conta de Voluntário</h1>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          <FormGroup label="Nome completo">{fi("Nome completo")}</FormGroup>
+          <FormGroup label="Nome completo"><input value={details.fullName} onChange={event => update("fullName", event.target.value)} placeholder="Nome completo" required style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit" }} /></FormGroup>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-            <FormGroup label="CPF">{fi("000.000.000-00")}</FormGroup>
-            <FormGroup label="Telefone">{fi("(27) 99999-9999")}</FormGroup>
+            <FormGroup label="CPF"><input value={details.cpf} onChange={event => update("cpf", event.target.value)} placeholder="000.000.000-00" style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit" }} /></FormGroup>
+            <FormGroup label="Cidade"><input value={details.city} onChange={event => update("city", event.target.value)} placeholder="Vitória, ES" style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit" }} /></FormGroup>
           </div>
-          <FormGroup label="E-mail">{fi("seu@email.com", "email")}</FormGroup>
-          <FormGroup label="Data de nascimento">{fi("DD/MM/AAAA", "date")}</FormGroup>
+          <FormGroup label="E-mail"><input type="email" value={details.email} onChange={event => update("email", event.target.value)} placeholder="seu@email.com" required style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit" }} /></FormGroup>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-            <FormGroup label="Senha">{fi("Mínimo 8 caracteres", "password")}</FormGroup>
-            <FormGroup label="Confirmar senha">{fi("Confirmar senha", "password")}</FormGroup>
+            <FormGroup label="Senha"><input type="password" value={details.password} onChange={event => update("password", event.target.value)} placeholder="Mínimo 8 caracteres" minLength={8} required style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit" }} /></FormGroup>
+            <FormGroup label="Confirmar senha"><input type="password" value={details.confirmation} onChange={event => update("confirmation", event.target.value)} placeholder="Confirmar senha" minLength={8} required style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit" }} /></FormGroup>
           </div>
           <label style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", fontSize: "0.85rem", color: "#374151", cursor: "pointer", marginBottom: "0.5rem" }}>
             <input type="checkbox" checked={termos} onChange={e => setTermos(e.target.checked)} style={{ marginTop: 2 }} />
             Li e concordo com os termos de uso e política de privacidade.
           </label>
-          <BtnPrimary onClick={onSuccess} full>Criar minha conta</BtnPrimary>
+          {formError && <p role="alert" style={{ color: "#991b1b", fontSize: "0.85rem" }}>{formError}</p>}
+          <BtnPrimary onClick={() => {
+            if (!details.fullName.trim() || !details.email.trim() || details.password.length < 8) {
+              setFormError("Preencha nome, e-mail e uma senha com pelo menos 8 caracteres.");
+              return;
+            }
+            if (details.cpf && details.cpf.replace(/\D/g, "").length !== 11) {
+              setFormError("Informe um CPF válido com 11 dígitos.");
+              return;
+            }
+            if (details.password !== details.confirmation) {
+              setFormError("As senhas não coincidem.");
+              return;
+            }
+            if (!termos) {
+              setFormError("É necessário aceitar os termos de uso.");
+              return;
+            }
+            setFormError("");
+            const username = details.email.split("@")[0].replace(/[^A-Za-z0-9_.-]/g, "_").slice(0, 25);
+            onSuccess({ ...details, username: username.length >= 3 ? username : `voluntario_${Date.now()}`, accountType: "voluntario" });
+          }} full>Criar minha conta</BtnPrimary>
         </div>
       </div>
     </div>
@@ -199,7 +222,9 @@ export function VolunteerRegistrationPage({ nav, onSuccess }: { nav: PageNavigat
 
 // ── 4. LOGIN DA ONG ───────────────────────────────────────────────────────
 
-export function OrganizationLoginPage({ nav, onLogin }: { nav: PageNavigation; onLogin: (id: number) => void }) {
+export function OrganizationLoginPage({ nav, onLogin }: { nav: PageNavigation; onLogin: (email: string, password: string) => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   return (
     <div style={{ minHeight: "calc(100vh - 64px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem", background: "#f9fafb" }}>
       <div style={{ maxWidth: 440, width: "100%", background: "#fff", borderRadius: 16, padding: "2.5rem", border: "1px solid #e5e7eb", boxShadow: "0 4px 24px #0000000a" }}>
@@ -213,11 +238,11 @@ export function OrganizationLoginPage({ nav, onLogin }: { nav: PageNavigation; o
             Acesse o painel da sua organização para divulgar oportunidades, gerenciar voluntários e apresentar suas ações.
           </p>
         </div>
-        <FormGroup label="CNPJ">
-          <input placeholder="00.000.000/0000-00" style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit" }} />
+        <FormGroup label="E-mail da conta">
+          <input type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="contato@ong.org.br" style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit" }} />
         </FormGroup>
         <FormGroup label="Senha">
-          <input type="password" placeholder="Senha" style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit" }} />
+          <input type="password" value={password} onChange={event => setPassword(event.target.value)} placeholder="Senha" style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit" }} />
         </FormGroup>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", fontSize: "0.85rem" }}>
           <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", color: "#374151", cursor: "pointer" }}>
@@ -225,7 +250,7 @@ export function OrganizationLoginPage({ nav, onLogin }: { nav: PageNavigation; o
           </label>
           <span style={{ color: "#22c55e", cursor: "pointer" }}>Esqueci minha senha</span>
         </div>
-        <BtnPrimary onClick={() => onLogin(1)} full>Entrar como ONG</BtnPrimary>
+        <BtnPrimary onClick={() => onLogin(email, password)} full>Entrar como ONG</BtnPrimary>
         <p style={{ textAlign: "center", color: "#9ca3af", fontSize: "0.85rem", marginTop: "1.25rem" }}>
           Ainda não possui uma conta?{" "}
           <span onClick={() => nav("cadastro-ong-full")} style={{ color: "#22c55e", cursor: "pointer", fontWeight: 600 }}>Cadastrar minha ONG</span>
@@ -237,10 +262,17 @@ export function OrganizationLoginPage({ nav, onLogin }: { nav: PageNavigation; o
 
 // ── 5. CADASTRO DA ONG ────────────────────────────────────────────────────
 
-export function OrganizationRegistrationPage({ nav, onSuccess }: { nav: PageNavigation; onSuccess: () => void }) {
+export function OrganizationRegistrationPage({ nav, onSuccess }: { nav: PageNavigation; onSuccess: (details: RegistrationDetails) => void }) {
   const [termos, setTermos] = useState(false);
-  const fi = (ph: string, type = "text") => (
-    <input type={type} placeholder={ph} style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit" }} />
+  const [formError, setFormError] = useState("");
+  const [details, setDetails] = useState({
+    name: "", cnpj: "", email: "", city: "", cause: "Saúde", description: "", website: "", password: "", confirmation: "",
+  });
+  const update = (key: keyof typeof details, value: string) => setDetails(current => ({ ...current, [key]: value }));
+  const fi = (key: keyof typeof details, ph: string, type = "text") => (
+    <input type={type} value={details[key]} onChange={event => update(key, event.target.value)} placeholder={ph}
+      required={["name", "email", "city", "description", "password", "confirmation"].includes(key)}
+      style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit" }} />
   );
   return (
     <div style={{ background: "#f9fafb", padding: "2.5rem 1.5rem", minHeight: "calc(100vh - 64px)" }}>
@@ -255,20 +287,13 @@ export function OrganizationRegistrationPage({ nav, onSuccess }: { nav: PageNavi
 
         <SectionDivider label="Dados da organização" />
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginBottom: "1.5rem" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-            <FormGroup label="Nome da ONG">{fi("Nome oficial")}</FormGroup>
-            <FormGroup label="Nome fantasia">{fi("Como é conhecida")}</FormGroup>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-            <FormGroup label="CNPJ">{fi("00.000.000/0000-00")}</FormGroup>
-            <FormGroup label="Telefone">{fi("(27) 99999-9999")}</FormGroup>
-          </div>
-          <FormGroup label="E-mail institucional">{fi("contato@ong.org.br", "email")}</FormGroup>
-          <FormGroup label="Endereço">{fi("Rua, número, bairro")}</FormGroup>
+          <FormGroup label="Nome da ONG">{fi("name", "Nome oficial")}</FormGroup>
+          <FormGroup label="CNPJ">{fi("cnpj", "00.000.000/0000-00")}</FormGroup>
+          <FormGroup label="E-mail institucional">{fi("email", "contato@ong.org.br", "email")}</FormGroup>
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "1rem" }}>
-            <FormGroup label="Cidade">{fi("Vitória")}</FormGroup>
+            <FormGroup label="Cidade">{fi("city", "Vitória")}</FormGroup>
             <FormGroup label="Estado">
-              <select style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit", background: "#fff" }}>
+              <select defaultValue="ES" style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit", background: "#fff" }}>
                 <option value="ES">ES</option>
                 <option value="SP">SP</option>
                 <option value="RJ">RJ</option>
@@ -281,15 +306,15 @@ export function OrganizationRegistrationPage({ nav, onSuccess }: { nav: PageNavi
         <SectionDivider label="Informações da ONG" />
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginBottom: "1.5rem" }}>
           <FormGroup label="Área de atuação">
-            <select style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit", background: "#fff" }}>
+            <select value={details.cause} onChange={event => update("cause", event.target.value)} style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit", background: "#fff" }}>
               {["Saúde", "Assistência Social", "Meio Ambiente", "Educação", "Cultura", "Tecnologia Social"].map(a => <option key={a}>{a}</option>)}
             </select>
           </FormGroup>
           <FormGroup label="Descrição da organização">
-            <textarea rows={4} placeholder="Conte a história e missão da sua ONG..."
+            <textarea value={details.description} onChange={event => update("description", event.target.value)} rows={4} placeholder="Conte a história e missão da sua ONG..."
               style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit", resize: "vertical" }} />
           </FormGroup>
-          <FormGroup label="Site ou redes sociais">{fi("https://www.suaong.org.br")}</FormGroup>
+          <FormGroup label="Site ou redes sociais">{fi("website", "https://www.suaong.org.br")}</FormGroup>
           <FormGroup label="Logo da ONG">
             <div style={{ border: "2px dashed #e5e7eb", borderRadius: 10, padding: "1.5rem", textAlign: "center", color: "#9ca3af", cursor: "pointer", fontSize: "0.9rem" }}>
               📷 Clique para fazer upload da logo
@@ -300,8 +325,8 @@ export function OrganizationRegistrationPage({ nav, onSuccess }: { nav: PageNavi
         <SectionDivider label="Dados de acesso" />
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginBottom: "1.5rem" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-            <FormGroup label="Senha">{fi("Mínimo 8 caracteres", "password")}</FormGroup>
-            <FormGroup label="Confirmar senha">{fi("Confirmar senha", "password")}</FormGroup>
+            <FormGroup label="Senha">{fi("password", "Mínimo 8 caracteres", "password")}</FormGroup>
+            <FormGroup label="Confirmar senha">{fi("confirmation", "Confirmar senha", "password")}</FormGroup>
           </div>
         </div>
 
@@ -309,7 +334,43 @@ export function OrganizationRegistrationPage({ nav, onSuccess }: { nav: PageNavi
           <input type="checkbox" checked={termos} onChange={e => setTermos(e.target.checked)} style={{ marginTop: 2 }} />
           Li e concordo com os termos de uso e política de privacidade.
         </label>
-        <BtnPrimary onClick={onSuccess} full>Cadastrar ONG</BtnPrimary>
+        {formError && <p role="alert" style={{ color: "#991b1b", fontSize: "0.85rem", marginBottom: "1rem" }}>{formError}</p>}
+        <BtnPrimary onClick={() => {
+          if (!details.name.trim() || !details.email.trim() || !details.city.trim() || !details.description.trim() || details.password.length < 8) {
+            setFormError("Preencha os campos obrigatórios e use uma senha com pelo menos 8 caracteres.");
+            return;
+          }
+          if (details.cnpj && details.cnpj.replace(/\D/g, "").length !== 14) {
+            setFormError("Informe um CNPJ válido com 14 dígitos.");
+            return;
+          }
+          if (details.password !== details.confirmation) {
+            setFormError("As senhas não coincidem.");
+            return;
+          }
+          if (!termos) {
+            setFormError("É necessário aceitar os termos de uso.");
+            return;
+          }
+          setFormError("");
+          const username = details.email.split("@")[0].replace(/[^A-Za-z0-9_.-]/g, "_").slice(0, 25);
+          onSuccess({
+            email: details.email,
+            password: details.password,
+            city: details.city,
+            fullName: details.name,
+            username: username.length >= 3 ? username : `ong_${Date.now()}`,
+            accountType: "ong",
+            organization: {
+              name: details.name,
+              cnpj: details.cnpj,
+              city: details.city,
+              cause: details.cause,
+              description: details.description,
+              website: details.website,
+            },
+          });
+        }} full>Cadastrar ONG</BtnPrimary>
       </div>
     </div>
   );

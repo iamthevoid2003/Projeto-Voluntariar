@@ -1,4 +1,4 @@
-import type { VolunteerStatus } from "../types/models";
+import type { EntityId, Organization, Project, VolunteerStatus } from "../types/models";
 import { organizations, projects } from "../data/mock-data";
 
 export const statusLabel: Record<VolunteerStatus, string> = {
@@ -24,16 +24,16 @@ export const areaBadgeStyle: Record<string, { bg: string; color: string }> = {
   "Educação":         { bg: "#dbeafe", color: "#1e40af" },
 };
 
-export function getOrganization(id: number) {
-  const organization = organizations.find(item => item.id === id);
+export function getOrganization(id: EntityId, source: Organization[] = organizations) {
+  const organization = source.find(item => String(item.id) === String(id));
   if (!organization) {
     throw new Error(`Organization ${id} was not found.`);
   }
   return organization;
 }
 
-export function getProject(id: number) {
-  const project = projects.find(item => item.id === id);
+export function getProject(id: EntityId, source: Project[] = projects) {
+  const project = source.find(item => String(item.id) === String(id));
   if (!project) {
     throw new Error(`Project ${id} was not found.`);
   }

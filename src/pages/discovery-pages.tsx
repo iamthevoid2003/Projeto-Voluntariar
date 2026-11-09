@@ -1,11 +1,9 @@
 import { useState } from "react";
-import type { Organization, Project, PageNavigation } from "../types/models";
-import { organizations, projects } from "../data/mock-data";
-import { getOrganization } from "../utils/presentation";
+import type { EntityId, Organization, Project, PageNavigation } from "../types/models";
 import { AreaBadge, Badge, BtnPrimary, BtnSecondary, BtnSm, FormGroup, FormInput, PageHero } from "../components/ui";
 import { OrganizationCard, ProjectCard, ProjectRow } from "../components/cards";
 
-export function HomePage({ nav, onApply, hasApplied }: { nav: PageNavigation; onApply: (p: Project) => void; hasApplied: (id: number) => boolean }) {
+export function HomePage({ organizations, projects, nav, onApply, hasApplied }: { organizations: Organization[]; projects: Project[]; nav: PageNavigation; onApply: (p: Project) => void; hasApplied: (id: EntityId) => boolean }) {
   const featuredOrganizations = organizations.slice(0, 3);
   const recentProjects = projects.slice(0, 4);
 
@@ -37,7 +35,7 @@ export function HomePage({ nav, onApply, hasApplied }: { nav: PageNavigation; on
           { n: organizations.length, label: "ONGs parceiras" },
           { n: projects.length, label: "Projetos ativos" },
           { n: "ES", label: "Estado de atuação" },
-          { n: "5", label: "Entidades no sistema" },
+          { n: organizations.length + projects.length, label: "Cadastros ativos" },
         ].map(s => (
           <div key={s.label} style={{ textAlign: "center" }}>
             <strong style={{ display: "block", fontSize: "2rem", fontWeight: 900, color: "#22c55e" }}>{s.n}</strong>
@@ -77,7 +75,7 @@ export function HomePage({ nav, onApply, hasApplied }: { nav: PageNavigation; on
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(340px,1fr))", gap: "1.5rem" }}>
             {recentProjects.map(p => (
-              <ProjectCard key={p.id} project={p} hasApplied={hasApplied(p.id)} onApply={() => onApply(p)} />
+              <ProjectCard key={p.id} project={p} organizations={organizations} hasApplied={hasApplied(p.id)} onApply={() => onApply(p)} />
             ))}
           </div>
           <div style={{ textAlign: "center", marginTop: "2rem" }}>
@@ -105,7 +103,7 @@ export function HomePage({ nav, onApply, hasApplied }: { nav: PageNavigation; on
 
 // ── ONGS PAGE ─────────────────────────────────────────────────────────────
 
-export function OrganizationsPage({ nav, isMember, onJoin }: { nav: PageNavigation; isMember: (id: number) => boolean; onJoin: (o: Organization) => void }) {
+export function OrganizationsPage({ organizations, nav, isMember, onJoin }: { organizations: Organization[]; nav: PageNavigation; isMember: (id: EntityId) => boolean; onJoin: (o: Organization) => void }) {
   const [searchTerm, setBusca] = useState("");
   const [causeFilter, setCauseFilter] = useState("Todas");
 
@@ -151,9 +149,9 @@ export function OrganizationsPage({ nav, isMember, onJoin }: { nav: PageNavigati
 
 // ── PROJETOS PAGE ─────────────────────────────────────────────────────────
 
-export function ProjectsPage({ causeFilter, setCauseFilter, filteredProjects, nav, onApply, hasApplied }: {
+export function ProjectsPage({ organizations, causeFilter, setCauseFilter, filteredProjects, nav, onApply, hasApplied }: {
   causeFilter: string; setCauseFilter: (a: string) => void; filteredProjects: Project[];
-  nav: PageNavigation; onApply: (p: Project) => void; hasApplied: (id: number) => boolean;
+  organizations: Organization[]; nav: PageNavigation; onApply: (p: Project) => void; hasApplied: (id: EntityId) => boolean;
 }) {
   const [searchTerm, setBusca] = useState("");
   const final = filteredProjects.filter(p => p.title.toLowerCase().includes(searchTerm.toLowerCase()) || p.description.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -174,7 +172,7 @@ export function ProjectsPage({ causeFilter, setCauseFilter, filteredProjects, na
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             {final.map(p => (
-              <ProjectRow key={p.id} project={p} hasApplied={hasApplied(p.id)} onApply={() => onApply(p)} />
+              <ProjectRow key={p.id} project={p} organizations={organizations} hasApplied={hasApplied(p.id)} onApply={() => onApply(p)} />
             ))}
           </div>
           {final.length === 0 && <p style={{ textAlign: "center", color: "#9ca3af", padding: "3rem" }}>Nenhum projeto encontrado.</p>}
@@ -186,11 +184,11 @@ export function ProjectsPage({ causeFilter, setCauseFilter, filteredProjects, na
 
 // ── ONG DETALHE PAGE ──────────────────────────────────────────────────────
 
-export function OrganizationDetailPage({ organization, nav, onApply, hasApplied, isMember, onJoin }: {
-  organization: Organization; nav: PageNavigation; onApply: (p: Project) => void;
-  hasApplied: (id: number) => boolean; isMember: (id: number) => boolean; onJoin: (o: Organization) => void;
+export function OrganizationDetailPage({ organization, organizations, projects, nav, onApply, hasApplied, isMember, onJoin }: {
+  organization: Organization; organizations: Organization[]; projects: Project[]; nav: PageNavigation; onApply: (p: Project) => void;
+  hasApplied: (id: EntityId) => boolean; isMember: (id: EntityId) => boolean; onJoin: (o: Organization) => void;
 }) {
-  const organizationProjects = projects.filter(p => p.organizationId === organization.id);
+  const organizationProjects = projects.filter(p => String(p.organizationId) === String(organization.id));
   const membro = isMember(organization.id);
 
   return (
@@ -244,7 +242,7 @@ export function OrganizationDetailPage({ organization, nav, onApply, hasApplied,
             <div style={{ background: "#f3f4f6", borderRadius: 14, padding: "1.5rem", marginBottom: "1.5rem" }}>
               <h3 style={{ fontSize: "0.9rem", fontWeight: 700, marginBottom: "1rem", color: "#374151" }}>DADOS DA ONG</h3>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                <div><strong style={{ fontSize: "1.3rem", color: "#22c55e" }}>{organization.memberCount}</strong><br /><span style={{ fontSize: "0.8rem", color: "#4b5563" }}>Membros cadastrados</span></div>
+                {organization.memberCount !== undefined && <div><strong style={{ fontSize: "1.3rem", color: "#22c55e" }}>{organization.memberCount}</strong><br /><span style={{ fontSize: "0.8rem", color: "#4b5563" }}>Membros cadastrados</span></div>}
                 <div><strong style={{ fontSize: "1.3rem", color: "#22c55e" }}>{organizationProjects.length}</strong><br /><span style={{ fontSize: "0.8rem", color: "#4b5563" }}>Projetos ativos</span></div>
               </div>
             </div>
@@ -263,7 +261,7 @@ export function OrganizationDetailPage({ organization, nav, onApply, hasApplied,
 
 // ── LOGIN PAGE ────────────────────────────────────────────────────────────
 
-export function DonationPage({ showToast }: { showToast: (msg: string) => void }) {
+export function DonationPage({ organizations, showToast }: { organizations: Organization[]; showToast: (msg: string) => void }) {
   const [ongSel, setOngSel] = useState(0);
   const [valor, setValor] = useState(50);
   const [valorCustom, setValorCustom] = useState("");
@@ -273,6 +271,7 @@ export function DonationPage({ showToast }: { showToast: (msg: string) => void }
   const [sucesso, setSucesso] = useState(false);
 
   const valorFinal = valor === 0 ? Number(valorCustom) || 0 : valor;
+  const selectedOrganization = organizations[ongSel];
 
   const impactos: Record<number, string> = {
     50:  "Com R$50, você garante materiais de apoio para <strong>1 criança</strong> em tratamento na ACACCI por um mês.",
@@ -289,7 +288,7 @@ export function DonationPage({ showToast }: { showToast: (msg: string) => void }
           <div style={{ fontSize: "4rem", marginBottom: "1rem" }}>🎉</div>
           <h2 style={{ fontSize: "1.8rem", fontWeight: 900, marginBottom: "0.75rem" }}>Doação confirmada!</h2>
           <p style={{ color: "#4b5563", marginBottom: "1.5rem" }}>
-            Obrigado! Sua doação de <strong>R${valorFinal}</strong> para a <strong>{organizations[ongSel].name}</strong> chegará em até 1 dia útil.
+            Obrigado! Sua doação de <strong>R${valorFinal}</strong> para a <strong>{selectedOrganization?.name ?? "organização selecionada"}</strong> chegará em até 1 dia útil.
           </p>
           <div style={{ background: "linear-gradient(135deg,#dcfce7,#bbf7d0)", borderLeft: "4px solid #22c55e", borderRadius: 10, padding: "1rem 1.25rem", marginBottom: "1.5rem", textAlign: "left" }}>
             <p style={{ fontSize: "0.9rem", color: "#374151" }} dangerouslySetInnerHTML={{ __html: "💡 <strong>Impacto da sua doação:</strong> " + impactoMsg }} />
@@ -310,7 +309,9 @@ export function DonationPage({ showToast }: { showToast: (msg: string) => void }
           <FormGroup label="Escolha a ONG beneficiada">
             <select value={ongSel} onChange={e => setOngSel(Number(e.target.value))}
               style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: 10, border: "1.5px solid #e5e7eb", fontSize: "0.95rem", outline: "none", fontFamily: "inherit", background: "#fff" }}>
-              {organizations.map((o, i) => <option key={o.id} value={i}>{o.icon} {o.name} – {o.cause}</option>)}
+              {organizations.length === 0
+                ? <option value={0}>Nenhuma ONG cadastrada</option>
+                : organizations.map((o, i) => <option key={o.id} value={i}>{o.icon} {o.name} – {o.cause}</option>)}
             </select>
           </FormGroup>
 
@@ -379,9 +380,11 @@ export function DonationPage({ showToast }: { showToast: (msg: string) => void }
             </FormGroup>
           )}
 
-          <BtnPrimary onClick={() => { setSucesso(true); showToast("Doação confirmada! 💚"); }} full>
-            ✅ Confirmar Doação{valorFinal > 0 ? ` de R$${valorFinal}` : ""}
-          </BtnPrimary>
+          {organizations.length > 0
+            ? <BtnPrimary onClick={() => { setSucesso(true); showToast("Doação confirmada! 💚"); }} full>
+                ✅ Confirmar Doação{valorFinal > 0 ? ` de R$${valorFinal}` : ""}
+              </BtnPrimary>
+            : <p role="status" style={{ color: "#6b7280", textAlign: "center" }}>Nenhuma ONG cadastrada para receber doações.</p>}
         </div>
       </section>
     </div>
